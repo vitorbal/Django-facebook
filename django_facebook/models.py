@@ -5,6 +5,33 @@ from django.conf import settings
 from django.db.models import fields
 from django.utils.translation import ugettext as _
 
+class BigIntegerField(fields.IntegerField):
+    '''Class to be used for the facebook_id fields, that need BigInt, which is
+       not natively supported by django 1.0 (see ticket #399)
+    '''
+    
+    def db_type(self):
+        if settings.DATABASE_ENGINE == 'mysql':
+            return "bigint"
+        elif settings.DATABASE_ENGINE == 'oracle':
+            return "NUMBER(19)"
+        elif settings.DATABASE_ENGINE[:8] == 'postgres':
+            return "bigint"
+        else:
+            raise NotImplemented
+    
+    def get_internal_type(self):
+        return "BigIntegerField"
+    
+    def to_python(self, value):
+        if value is None:
+            return value
+        try:
+            return long(value)
+        except (TypeError, ValueError):
+            raise exceptions.ValidationError(
+                _("This value must be a long integer."))
+
 class FacebookProfileModel(models.Model):
     '''
     Abstract class to add to your profile model.
@@ -83,30 +110,3 @@ class FacebookLike(models.Model):
 
     class Meta:
         unique_together = ['user_id', 'facebook_id']
-        
-class BigIntegerField(fields.IntegerField):
-    '''Class to be used for the facebook_id fields, that need BigInt, which is
-       not natively supported by django 1.0 (see ticket #399)
-    '''
-    
-    def db_type(self):
-        if settings.DATABASE_ENGINE == 'mysql':
-            return "bigint"
-        elif settings.DATABASE_ENGINE == 'oracle':
-            return "NUMBER(19)"
-        elif settings.DATABASE_ENGINE[:8] == 'postgres':
-            return "bigint"
-        else:
-            raise NotImplemented
-    
-    def get_internal_type(self):
-        return "BigIntegerField"
-    
-    def to_python(self, value):
-        if value is None:
-            return value
-        try:
-            return long(value)
-        except (TypeError, ValueError):
-            raise exceptions.ValidationError(
-                _("This value must be a long integer."))
