@@ -1,6 +1,9 @@
 from django.db import models
 from django.core.urlresolvers import reverse
-
+from django.core import exceptions
+from django.conf import settings
+from django.db.models import fields
+from django.utils.translation import ugettext as _
 
 class FacebookProfileModel(models.Model):
     '''
@@ -9,7 +12,7 @@ class FacebookProfileModel(models.Model):
     the fields in.
     '''
     about_me = models.TextField(blank=True)
-    facebook_id = models.BigIntegerField(blank=True, unique=True, null=True)
+    facebook_id = BigIntegerField(blank=True, unique=True, null=True)
     access_token = models.TextField(
         blank=True, help_text='Facebook token for offline access')
     facebook_name = models.CharField(max_length=255, blank=True)
@@ -59,7 +62,7 @@ class FacebookUser(models.Model):
     # in order to be able to easily move these to an another db,
     # use a user_id and no foreign key
     user_id = models.IntegerField()
-    facebook_id = models.BigIntegerField()
+    facebook_id = BigIntegerField()
     name = models.TextField(blank=True, null=True)
 
     class Meta:
@@ -73,10 +76,37 @@ class FacebookLike(models.Model):
     # in order to be able to easily move these to an another db,
     # use a user_id and no foreign key
     user_id = models.IntegerField()
-    facebook_id = models.BigIntegerField()
+    facebook_id = BigIntegerField()
     name = models.TextField(blank=True, null=True)
     category = models.TextField(blank=True, null=True)
     created_time = models.DateTimeField(blank=True, null=True)
 
     class Meta:
         unique_together = ['user_id', 'facebook_id']
+        
+class BigIntegerField(fields.IntegerField):
+    '''Class to be used for the facebook_id fields, that need BigInt, which is
+       not natively supported by django 1.0 (see ticket #399)
+    '''
+    
+    def db_type(self):
+        if settings.DATABASE_ENGINE == 'mysql':
+            return "bigint"
+        elif settings.DATABASE_ENGINE == 'oracle':
+            return "NUMBER(19)"
+        elif settings.DATABASE_ENGINE[:8] == 'postgres':
+            return "bigint"
+        else:
+            raise NotImplemented
+    
+    def get_internal_type(self):
+        return "BigIntegerField"
+    
+    def to_python(self, value):
+        if value is None:
+            return value
+        try:
+            return long(value)
+        except (TypeError, ValueError):
+            raise exceptions.ValidationError(
+                _("This value must be a long integer."))
